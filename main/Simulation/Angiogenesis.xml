@@ -1,0 +1,183 @@
+<!-- 
+This simple CC3D demo demonstrates the spontaneous organization of cells as narrow filaments.
+In biology, this phenomenon happens among enodthelial cells during the vascular development.
+I (Pedro Dal-Castel) will present the important aspects that make this simulation work, then
+I will make some considerations about investigating parameters to obtain different results. 
+-->
+
+
+<CompuCell3D Revision="20210612" Version="4.2.5">
+   
+   <Metadata>
+      <NumberOfProcessors>1</NumberOfProcessors>
+      <DebugOutputFrequency>10</DebugOutputFrequency>
+   </Metadata>
+   
+   <Potts>
+      <!-- Here I define the lattice and Potts properties.  -->
+      <!-- A nice and big lattice of 500x500 is enough to accommodate 4000 cells. -->
+      <Dimensions x="128" y="128" z="1"/>
+      <Steps>100000</Steps>
+      <Temperature>10.0</Temperature>
+      <NeighborOrder>1</NeighborOrder>
+      <Boundary_x>Periodic</Boundary_x>
+      <Boundary_y>Periodic</Boundary_y>
+   </Potts>
+   
+   <Plugin Name="CellType">
+      <!-- I am using only one cell type: EC = endothelial cell. -->
+      <!-- In some experiments, you will find angiogenesis with other cell types. -->
+      <!-- If you intend to add more cell types, modify it here. -->
+      <CellType TypeId="0" TypeName="Medium"/>
+      <CellType TypeId="1" TypeName="EC"/>
+   </Plugin>
+   
+   <Plugin Name="Volume">
+      <!-- My cells are small. You can adjust their size by changing TargetVolume -->
+      <!-- My cells are also very stiff. You can decrease stiffness by lowering LambdaVolume. -->
+      <!-- I made them stiff so they dont die in case of strong interactions -->
+      <VolumeEnergyParameters CellType="EC" LambdaVolume="50.0" TargetVolume="25"/>
+   </Plugin>
+   
+   <Plugin Name="CenterOfMass">
+   </Plugin>
+   
+   <Plugin Name="Contact">
+      <!-- Here I set contact energies to neutral, i.e., cells have no preference 
+      to be in contact with medium or other cells -->
+      <!-- If you want cells to stick to each other, simply increase Medium-EC energy or decrease EC-EC. -->
+      <!-- If you want cells to avoid each other, do the opposite. -->
+      <Energy Type1="Medium" Type2="Medium">10.0</Energy>
+      <Energy Type1="Medium" Type2="EC">10.0</Energy>
+      <Energy Type1="EC" Type2="EC">20.0</Energy>
+      <NeighborOrder>4</NeighborOrder>
+   </Plugin>
+   
+   <Plugin Name="Chemotaxis">
+      <ChemicalField Name="VEGF">
+         <!-- I set EC to chemotact according to VEGF gradients. Since all ECs secrete VEGF,
+         this will make them attract to each other at short-medium distances. -->
+         <!-- I set EC to advance only towards medium, this is important so they stop pushing against
+         each other when they reach contact. -->
+         <!-- The Lambda parameter regulates the chemotactic forces acting over ECs boundaries. -->
+         <!-- The saturation parameter is important to prevent cell disruption when VEGF is too steep
+         and intesifies chemotaxis otherwise. -->
+         <ChemotaxisByType ChemotactTowards="Medium" SaturationLinearCoef="0.5" Lambda="2000.0" Type="EC"/>
+      </ChemicalField>
+   </Plugin>
+   
+   <Plugin Name="LengthConstraint">
+      <!-- It is common to observe elongated cells in experiments. -->
+      <!-- This PlugIn allows you to investigate the effect of cell elongation in angiogenesis patterns. -->
+      <LengthEnergyParameters CellType="EC" LambdaLength="0.0" TargetLength="25"/>
+   </Plugin>
+   
+   <Steppable Type="DiffusionSolverFE">
+      
+      <!-- Specification of PDE solvers -->
+      <!-- Here I configure VEGF diffusion, secretion, decay etc. -->
+      <DiffusionField Name="VEGF">
+         <DiffusionData>
+            <FieldName>VEGF</FieldName>
+            <!-- Diffusion constant can stay fixed -->
+            <GlobalDiffusionConstant>1.0</GlobalDiffusionConstant>
+            <!-- The decay constant will regulate how far VEGF will reach away from cells. -->
+            <!-- High decays cause higher gradients outside cell clusters, which makes filaments narrower. -->
+            <!-- Lower decays cause lower gradients outside cell clusters, which thickens filaments. -->
+            <!-- Lower decays also promotes interaction at longer ranges. This global attraction between cells promotes
+            formation of big cell blobs. -->
+            <GlobalDecayConstant>0.25</GlobalDecayConstant>
+            <!-- There is no reason to set diffusion different inside EC -->
+            <DiffusionCoefficient CellType="EC">1.0</DiffusionCoefficient>
+            <!-- A positive decay inside EC is more realistic, but I set it to zero because the objective was to 
+            isolte the angiogenesis phenomenon. For that, we don't need decay inside EC. -->
+            <DecayCoefficient CellType="EC">0.0</DecayCoefficient>
+         </DiffusionData>
+         <SecretionData>
+            <!-- Secretion is the amount of VEGF that EC produces each MCS. Same case as diffusion constant: I leave it
+            fixed and let the job be done by the other parameters. -->
+            <Secretion Type="EC">0.1</Secretion>
+         </SecretionData>
+         <BoundaryConditions>
+            <Plane Axis="X">
+               <Periodic/>
+            </Plane>
+            <Plane Axis="Y">
+               <Periodic/>
+            </Plane>
+         </BoundaryConditions>
+      </DiffusionField>
+   </Steppable>
+   
+   <Steppable Type="UniformInitializer">
+      
+      <Region>
+         <BoxMin x="0" y="0" z="0"/>
+         <BoxMax x="127" y="127" z="1"/>
+         <!-- Change the gap to start with different numbers of cells. -->
+         <!-- A larger gap will create less cells. A lower gap will create more cells. -->
+         <Gap>4</Gap>
+         <Width>4</Width>
+         <Types>EC</Types>
+      </Region>
+   </Steppable>
+</CompuCell3D>
+
+<!-- 
+Let me now tell you what parameters are interesting to sweep and in what range.
+
+I will start by quickly explaining how the simulation works.
+
+_____ HOW SIMULATION WORKS
+
+First, cells start all spread out. They secrete VEGF. VEGF diffuses through 
+space and decays, forming gradients.
+
+As all cells are secreting VEGF, gradients become milder between closer cells and 
+steeper towards empty medium regions.
+
+Note that VEGF, in the cell point of view, points inwards, except if the cell belongs
+to a large blob of cells, in that case, gradient will point towards the blob center.
+
+As cells are attracted by VEGF, they tend to close the distance between closer cells.
+
+When two cells are side by side, they sense less force in the major axis direction
+and stronger force in the minor axis direction, because VEGF gradient is steeper in
+the sides than in the extremes.
+
+Now think of a cluster of 10 cells. If it randomly achieves an elipsoidal shape, it 
+will be compressed by the sides, which favors the elongation of the cluster. This 
+means that filaments are stable structure in the system. 
+
+In response to VEGF, neighboring filaments tend to connect, and they keep sending 
+branches to keep small width.
+
+One behavior is particularly interesting: notice how small regions inside filaments
+tend to collapse due to VEGF pressure. These collapses form blobs, which are unstable.
+Then, this blob starts strengthening connected filaments, which in turn start sending
+new filaments elsewhere. This behavior prevents the system from achieving equilibrium.
+This means that in a single simulation you can see multiple angiogenesis patterns 
+forming and destroying successively.
+
+_____ INTERESTING PARAMETERS TO SWEEP
+
+To play with angiogenesis behavior, consider changing:
+
+1) Contact energy Medium-EC from 5 to 15
+2) Chemtoaxis saturation parameter from 0.25 to 1.0 (it will effectively change 
+    chemotactic force, so don't bother sweeping lambda)
+3) Length constraint: test lambda = 5
+4) Decay constant from 0.125 to 0.5 
+5) Gap between cells from 2 to 8
+
+As an activity for you, take notes of the effects of each parameter in the behavior of
+the system. Then try to explain mechanistically how each parameter affects it.
+
+If your cells get stuck in a big blob of cells, try a really high decay value and watch
+it sending filaments frenetically everywhere.
+
+You may notice how easy it is to achieve same patterns with different parameters. This
+is part of the reason why it is so difficult to quantitatively characterize an
+angiogenesis image.
+
+ -->
