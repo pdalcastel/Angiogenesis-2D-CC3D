@@ -1,6 +1,6 @@
 #!/bin/sh
 # made using https://github.com/JulianoGianlupi/cc3d-nanoHub-tool-setuper
-/usr/bin/invoke_app "$@" -C @tool/bin/Angiogenesis2D.sh -t Angiogenesis2D \
+/usr/bin/invoke_app "$@" -C @tool/bin/angiogenesis2d.sh -t angiogenesis2d \
                          -u compucell3d-4.2.2 \
                          -w captive \
                          -r none
