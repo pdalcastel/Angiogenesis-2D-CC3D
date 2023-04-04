@@ -1,5 +1,5 @@
 <!-- 
-This simulation was written by James Glazier, Pedro Dal-Castel and Joel Vanin.
+This simulation was designed by James Glazier and written by Pedro Dal-Castel.
 This simple CC3D demo demonstrates the spontaneous organization of cells as narrow filaments.
 In biology, this phenomenon happens among enodthelial cells during the vascular development.
 I (Pedro) will present the important aspects that make this simulation work, then I 
